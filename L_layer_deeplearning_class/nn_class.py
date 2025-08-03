@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[6]:
 
 
 #Libraries being used:
@@ -33,7 +33,7 @@ def entropy_loss_function_derivative(AL, Y):
     return dAL
 
 
-# In[4]:
+# In[79]:
 
 
 class L_layer_NN:
@@ -41,7 +41,7 @@ class L_layer_NN:
     #Later: add mini-batch
     #add Clipping, but first understand where clipping is required and why and how it fixes it and what it is
 
-    def __init__(self, layer_dims, learning_rate=0.01, lambd = 0, optimizer = "gd", initialization = "he", beta1 = 0.9, beta2 = 0.999):
+    def __init__(self, layer_dims, learning_rate=0.01, lambd = 0, optimizer = "gd", initialization = "he", beta1 = 0.9, beta2 = 0.999, batch_size = 64):
 
         self.layer_dims = layer_dims
         self.learning_rate = learning_rate
@@ -53,7 +53,8 @@ class L_layer_NN:
         self.grads = {}
         self.beta1 = beta1
         self.beta2 = beta2
-        self.iteration = 1
+        self.epoch = 1
+        self.batch_size = batch_size
 
 
         self._initialize_optimizer()
@@ -322,12 +323,12 @@ class L_layer_NN:
             self.squares["sdb" + str(l+1)] = self.beta2 * self.squares["sdb" + str(l+1)] + (1-self.beta2) * self.grads["db" + str(l+1)]**2
 
             #bias correction for velocities:
-            _vdW_corrected = self.velocities["vdW" + str(l+1)] / (1 - self.beta1**self.iteration)
-            _vdb_corrected = self.velocities["vdb" + str(l+1)] / (1 - self.beta1**self.iteration)
+            _vdW_corrected = self.velocities["vdW" + str(l+1)] / (1 - self.beta1**self.epoch)
+            _vdb_corrected = self.velocities["vdb" + str(l+1)] / (1 - self.beta1**self.epoch)
 
             #bias correction for squares:
-            _sdW_corrected = self.squares["sdW" + str(l+1)] / (1 - self.beta2**self.iteration)
-            _sdb_corrected = self.squares["sdb" + str(l+1)] / (1 - self.beta2**self.iteration)
+            _sdW_corrected = self.squares["sdW" + str(l+1)] / (1 - self.beta2**self.epoch)
+            _sdb_corrected = self.squares["sdb" + str(l+1)] / (1 - self.beta2**self.epoch)
 
             #update parameters:
             eps = 1e-8
@@ -357,23 +358,59 @@ class L_layer_NN:
 
         return (accuracy * 100)
 
-    def train(self, X, Y, iterations = 3000, print_cost=True):
+    def _suffle_into_mini_batches(self, X, y):
 
-        progress = tqdm(range(iterations), desc="Training", leave=True)
+        m = X.shape[1]
+
+        #suffle data
+        permutation = np.random.permutation(X.shape[1])
+        X_shuffled = X[:, permutation]
+        y_shuffled = y[:, permutation]
+
+        mini_batches = []
+
+        for i in range(0, m, self.batch_size):
+
+            X_batch = X_shuffled[:, i : i + self.batch_size]
+            y_batch = y_shuffled[:, i : i + self.batch_size]
+
+            batch = np.vstack((X_batch, y_batch)) #shape (n_x + n_y, batch_size)
+            mini_batches.append(batch)
+
+        return mini_batches
+
+
+
+
+    def train(self, X, y, epochs = 3000, print_cost=True):
+
+        n = X.shape[0]
+
+        progress = tqdm(range(epochs), desc="Training", leave=True)
 
         for i in progress:
 
-            AL, caches = self._forward(X)
-            cost = self._compute_cost(AL, Y)
+            mini_batches = self._suffle_into_mini_batches(X, y) #array with mini batchs, each batch shape: (n_x + n_y, batch_size) or (n_x + 1, batch_size)
+            epoch_cost = []
+            for batch in mini_batches:
 
-            self._backward(AL, Y, caches)
-            self._update_parameters()
+                batch_X = batch[:n, :]
+                batch_y = batch[n: , :]
+                #cjange the computation of cost to compute every #epochs or however design decision i want
+                AL, caches = self._forward(batch_X)
+                cost = self._compute_cost(AL, batch_y)
 
-            if(i % 100 == 0):
-                self.costs.append((i, cost))
-                if(print_cost): progress.set_postfix({ "Cost": f"{cost}" })
+                self._backward(AL, batch_y, caches)
+                self._update_parameters()
+                epoch_cost.append(cost)
 
-            self.iteration += 1
+            mean_cost = np.mean(epoch_cost)
+
+            if i % 10 == 0:
+                self.costs.append((i, mean_cost))
+                if(print_cost): progress.set_postfix({ "Mean cost": f"{mean_cost}" })
+
+            self.epoch += 1
 
     def predict(self, X):
 
@@ -385,22 +422,30 @@ class L_layer_NN:
 
         iters, values = zip(*self.costs)
         plt.plot(iters, values)
-        plt.xlabel("Iterations")
+        plt.xlabel("Epoch")
         plt.ylabel("Cost")
-        plt.title("Cost vs Iterations")
+        plt.title("Cost vs Epoch")
         plt.grid(True)
         plt.show()
 
 
 
-# In[ ]:
+# In[80]:
 
 
+X = np.random.randn(2, 5) * 10
+y = np.array([[1, 1, 1, 0, 0]])
 
+print(np.vstack((X, y)))
+print("\n\n")
 
+NN = L_layer_NN([X.shape[1], 5, 1], batch_size = 2)
+mini_batches = NN._suffle_into_mini_batches(X, y)
 
-# In[ ]:
-
+for batch in mini_batches:
+    print(batch[:X.shape[0], :])
+    print(batch[X.shape[0]:, :])
+    print("\n")
 
 
 
