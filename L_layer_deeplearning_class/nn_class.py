@@ -13,33 +13,41 @@ import matplotlib.pyplot as plt
 import copy
 
 
-# In[5]:
+# In[3]:
 
 
 def relu_derivative(Z):
 
     return (Z > 0).astype(float)
 
+def sigmoid(Z):
+
+    Z_clipped = np.clip(Z, -500, 500)
+    return 1 / (1 + np.exp(-Z_clipped))
+
 def sigmoid_derivative(Z):
 
-    S = 1 / (1 + np.exp(-Z))
+    S = sigmoid(Z)
 
     return S * (1 - S)
 
 def entropy_loss_function_derivative(AL, Y):
 
-    dAL = - (Y / AL) + ((1 - Y) / (1 - AL))
+    epsilon=1e-8
+    AL_clipped = np.clip(AL, epsilon, 1 - epsilon)
+
+    dAL = - (Y / AL_clipped) + ((1 - Y) / (1 - AL_clipped))
 
     return dAL
 
 
-# In[79]:
+# In[8]:
 
 
 class L_layer_NN:
 
-    #Later: add mini-batch
-    #add Clipping, but first understand where clipping is required and why and how it fixes it and what it is
+    #add dropout for regularization with all optimizers
+    #add learning rate decay to class using the function and test it out
 
     def __init__(self, layer_dims, learning_rate=0.01, lambd = 0, optimizer = "gd", initialization = "he", beta1 = 0.9, beta2 = 0.999, batch_size = 64):
 
@@ -83,7 +91,13 @@ class L_layer_NN:
 
         return parameters
 
+    #add this to my class and see if i get better predictions!
+    def _schedule_lr_decay(self, learning_rate0, epoch_num, decay_rate, time_interval=1000):
 
+        learning_rate = learning_rate0 / (1 + decay_rate * math.floor(epoch_num / time_interval))
+
+        # YOUR CODE ENDS HERE
+        return learning_rate
 
     def _linear_forward(self, A, W, b):
 
@@ -105,7 +119,7 @@ class L_layer_NN:
         if activation == "relu":
             A = np.maximum(0, Z)
         elif activation == "sigmoid":
-            A = 1 / (1 + np.exp(-Z))
+            A = sigmoid(Z)
         elif activation == "linear": 
             A = Z
         else:
@@ -412,6 +426,12 @@ class L_layer_NN:
 
             self.epoch += 1
 
+            #just for funssss -- delete it later!!
+            if(self.epoch == 300):
+                self.learning_rate = 0.001
+            if(self.epoch == 700):
+                self.learning_rate = 0.0001
+
     def predict(self, X):
 
         AL, _ = self._forward(X)
@@ -430,22 +450,14 @@ class L_layer_NN:
 
 
 
-# In[80]:
+# In[ ]:
 
 
-X = np.random.randn(2, 5) * 10
-y = np.array([[1, 1, 1, 0, 0]])
 
-print(np.vstack((X, y)))
-print("\n\n")
 
-NN = L_layer_NN([X.shape[1], 5, 1], batch_size = 2)
-mini_batches = NN._suffle_into_mini_batches(X, y)
 
-for batch in mini_batches:
-    print(batch[:X.shape[0], :])
-    print(batch[X.shape[0]:, :])
-    print("\n")
+# In[ ]:
+
 
 
 
